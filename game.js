@@ -61,6 +61,8 @@
   }
   function normalizeCode(input) {
     if (!input) return null;
+    const link = String(input).match(/join=([A-Za-z0-9]{6})/);
+    if (link) input = link[1];
     const cleaned = String(input).toUpperCase().split('').filter(ch => CODE_ALPHABET.includes(ch)).join('');
     if (cleaned.length !== 6 || !BROKERS[cleaned[0]]) return null;
     return cleaned;
@@ -280,13 +282,17 @@
 
   // ---------------------------------------------------------------- rendering helpers
   function halftonePattern(ctx, color, cell, dotFraction) {
-    const size = Math.max(2, Math.round(cell));
+    const dpr = window.devicePixelRatio || 1;
+    const size = Math.max(2, Math.round(cell * dpr));
     const tile = document.createElement('canvas');
     tile.width = size; tile.height = size;
     const t = tile.getContext('2d');
     t.fillStyle = color;
     t.beginPath(); t.arc(size / 2, size / 2, size * dotFraction, 0, Math.PI * 2); t.fill();
-    return ctx.createPattern(tile, 'repeat');
+    const pattern = ctx.createPattern(tile, 'repeat');
+    // Rasterised at device resolution, drawn at CSS size: crisp dots on high-density screens.
+    try { if (pattern.setTransform && typeof DOMMatrix !== 'undefined') pattern.setTransform(new DOMMatrix().scale(1 / dpr)); } catch (e) { /* older browsers: slightly soft dots */ }
+    return pattern;
   }
   function burstPath(ctx, cx, cy, outer, inner, points, rotationDeg) {
     const step = Math.PI / points, rot = rotationDeg * Math.PI / 180;
@@ -423,13 +429,16 @@
   const overlays = Array.from(document.querySelectorAll('.overlay'));
   let graceTimer = null;
   function showOverlay(id, grace) {
+    const changed = state.overlay !== (id || null);
     overlays.forEach(o => o.classList.toggle('show', o.id === id));
     state.overlay = id || null;
-    if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
-    if (id) {
-      const el = $(id);
-      if (grace) { el.classList.add('grace'); graceTimer = setTimeout(() => el.classList.remove('grace'), GAME_OVER_GRACE_MS); }
-      else el.classList.remove('grace');
+    if (changed) {
+      if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
+      if (id) {
+        const el = $(id);
+        if (grace) { el.classList.add('grace'); graceTimer = setTimeout(() => { el.classList.remove('grace'); graceTimer = null; }, GAME_OVER_GRACE_MS); }
+        else el.classList.remove('grace');
+      }
     }
     $('hud-buttons').classList.toggle('show', !id && engine.state === 'PLAYING');
     $('btn-restart').style.display = state.duel ? 'none' : '';
@@ -487,16 +496,28 @@
     state.duel = d;
     return d;
   }
-  function hostDuel() { newSession().host(state.settings); }
+  // Keep the screen on while a duel is open, so a host waiting for a friend is not put to sleep.
+  let wakeLock = null;
+  async function keepAwake() {
+    if (!state.duel || !navigator.wakeLock || document.hidden || wakeLock) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch (e) { /* unsupported or denied */ }
+  }
+  function releaseWake() { if (wakeLock) { try { wakeLock.release(); } catch (e) { /* ignore */ } wakeLock = null; } }
+  function hostDuel() { $('share-note').textContent = ''; newSession().host(state.settings); keepAwake(); }
   function joinDuel(raw) {
     const code = normalizeCode(raw) || '';
     const d = state.duel;
     if (d && code && d.roomCode === code && d.phase !== 'ERROR') { syncDuelUi(); return; }
     newSession().join(code);
+    keepAwake();
   }
   function closeDuel() {
     if (state.duel) state.duel.close();
     state.duel = null;
+    releaseWake();
     endToMenu();
   }
   function beginDuelRound(d, now) {
@@ -633,6 +654,7 @@
   document.addEventListener('pointerdown', () => sfx.unlock(), { capture: true });
   canvas.addEventListener('pointerdown', (ev) => {
     ev.preventDefault();
+    if (!ev.isPrimary) return;
     if (state.overlay) return;
     const now = performance.now();
     const rect = canvas.getBoundingClientRect();
@@ -648,8 +670,9 @@
     }
   }, { passive: false });
 
+  window.addEventListener('pagehide', () => { if (state.duel) closeDuel(); });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { if (state.duel) state.duel.onForeground(); return; }
+    if (!document.hidden) { if (state.duel) { state.duel.onForeground(); keepAwake(); } return; }
     const d = state.duel;
     if (d && d.phase === 'PLAYING' && engine.state === 'PLAYING') { engine.stop(); d.publishDone(engine.score); state.popups.length = 0; return; }
     if (!d && engine.state === 'PLAYING') { engine.pause(performance.now()); state.popups.length = 0; showOverlay('ov-pause'); }
@@ -681,7 +704,9 @@
   });
   $('btn-invite-join').addEventListener('click', () => {
     store.set('playerName', $('invite-name').value.trim());
-    joinDuel($('invite-code').textContent);
+    const code = $('invite-code').textContent;
+    history.replaceState(null, '', location.pathname);
+    joinDuel(code);
   });
   $('btn-invite-cancel').addEventListener('click', () => { history.replaceState(null, '', location.pathname); showOverlay('ov-start'); });
 
@@ -689,7 +714,9 @@
     const d = state.duel; if (!d || !d.roomCode) return;
     const text = inviteText(d.roomCode), url = inviteUrl(d.roomCode);
     if (navigator.share) {
-      try { await navigator.share({ title: 'Tap Circle', text, url }); return; } catch (e) { /* cancelled; fall through */ }
+      // Share targets append `url` themselves; keep it out of the text so the link is not sent twice.
+      const body = text.slice(0, text.length - url.length).trimEnd();
+      try { await navigator.share({ title: 'Tap Circle', text: body, url }); return; } catch (e) { /* cancelled; fall through */ }
     }
     try { await navigator.clipboard.writeText(text); $('share-note').textContent = 'Link copied – paste it in WhatsApp or any chat'; }
     catch (e) { $('share-note').textContent = url; }
