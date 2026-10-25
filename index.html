@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FFF4DC">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="description" content="Tap Circle – משחק רפלקסים: געו בעיגול לפני שהוא נעלם. לבד או ראש בראש מול חבר.">
+<title>Tap Circle – גע בעיגול</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  @font-face { font-family: "Secular One"; src: url("fonts/SecularOne-Regular.ttf") format("truetype"); font-display: swap; }
+  @font-face { font-family: "Bangers"; src: url("fonts/Bangers-Regular.ttf") format("truetype"); font-display: swap; }
+  :root { --paper:#FFF4DC; --ink:#161616; --red:#FF3B3B; --blue:#2F8BFF; --yellow:#FFE04A; --green:#3DD267; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; overflow:hidden; background:var(--paper); overscroll-behavior:none; }
+  body { font-family:"Secular One","Arial Black",Arial,sans-serif; color:var(--ink); touch-action:none; user-select:none; -webkit-user-select:none; }
+  canvas#game { position:fixed; inset:0; display:block; touch-action:none; }
+  #hud-buttons { position:fixed; top:102px; left:0; right:0; display:none; justify-content:center; gap:14px; pointer-events:none; }
+  #hud-buttons.show { display:flex; }
+  #hud-buttons .btn { pointer-events:auto; width:92px; padding:5px 0; font-size:15px; margin:0; }
+  .overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:18px; background:rgba(0,0,0,.4); z-index:5; overflow:auto; }
+  .overlay.show { display:flex; }
+  .overlay.grace .btn { pointer-events:none; }
+  .bubble { width:100%; max-width:360px; background:#fff; border:4px solid var(--ink); border-radius:18px; box-shadow:6px 6px 0 var(--ink); padding:22px 18px 20px; text-align:center; position:relative; }
+  .bubble::after { content:""; position:absolute; left:50%; bottom:-26px; width:0; height:0; margin-left:-17px; border-left:17px solid transparent; border-right:17px solid transparent; border-top:26px solid var(--ink); }
+  .bubble::before { content:""; position:absolute; left:50%; bottom:-18px; width:0; height:0; margin-left:-12px; border-left:12px solid transparent; border-right:12px solid transparent; border-top:19px solid #fff; z-index:1; }
+  h1 { font-size:24px; margin:0 0 8px; font-weight:normal; }
+  h1.green { color:var(--green); -webkit-text-stroke:1px var(--ink); } h1.red { color:var(--red); -webkit-text-stroke:1px var(--ink); }
+  p { margin:6px 0; font-size:15px; line-height:1.5; }
+  .big { font-family:Bangers,Impact,"Arial Black",sans-serif; font-size:56px; line-height:1; color:var(--yellow); -webkit-text-stroke:2px var(--ink); text-shadow:4px 4px 0 var(--ink); margin:8px 0; direction:ltr; }
+  .code { font-family:Bangers,Impact,"Arial Black",sans-serif; font-size:44px; letter-spacing:5px; color:var(--yellow); -webkit-text-stroke:2px var(--ink); text-shadow:4px 4px 0 var(--ink); margin:6px 0 2px; direction:ltr; }
+  .btn { display:block; width:100%; margin:12px auto 0; padding:12px 14px; border:3px solid var(--ink); border-radius:10px; box-shadow:4px 4px 0 var(--ink); font:inherit; font-size:17px; color:#fff; background:var(--red); cursor:pointer; text-decoration:none; }
+  .btn:active { transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink); }
+  .btn.blue { background:var(--blue); } .btn.green { background:var(--green); } .btn.yellow { background:var(--yellow); color:var(--ink); } .btn.white { background:#fff; color:var(--ink); }
+  .buttons { margin-top:34px; width:100%; max-width:300px; }
+  .wrap { width:100%; max-width:360px; display:flex; flex-direction:column; align-items:center; }
+  .small { font-size:13px; opacity:.7; margin-top:16px; }
+  .small a { color:var(--ink); }
+  input[type=text] { width:100%; height:48px; font:inherit; font-size:17px; padding:0 12px; border:3px solid var(--ink); border-radius:8px; background:var(--paper); color:var(--ink); text-align:center; }
+  input.ltr { direction:ltr; letter-spacing:3px; text-transform:uppercase; }
+  .section { margin-top:16px; text-align:right; }
+  .section > span { color:var(--red); font-size:15px; display:block; margin-bottom:4px; }
+  label.opt { display:flex; align-items:center; gap:10px; padding:7px 4px; font-size:16px; }
+  label.opt input { width:20px; height:20px; accent-color:var(--red); margin:0; }
+  .note { font-size:13px; opacity:.75; }
+  #new-best { color:var(--green); -webkit-text-stroke:0.5px var(--ink); font-size:18px; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud-buttons">
+  <button class="btn green" id="btn-restart">מחדש</button>
+  <button class="btn white" id="btn-menu">תפריט</button>
+</div>
+
+<div class="overlay" id="ov-start">
+  <div class="wrap">
+    <div class="bubble">
+      <h1>Tap Circle</h1>
+      <p>געו בעיגול לפני שהוא נעלם<br>‎+100 פגיעה · ‎−100 פספוס</p>
+    </div>
+    <div class="buttons">
+      <button class="btn yellow" id="btn-solo">שחקו לבד</button>
+      <button class="btn" id="btn-host">משחק מול חבר</button>
+      <button class="btn blue" id="btn-join">הצטרפות עם קוד</button>
+      <button class="btn white" id="btn-settings">הגדרות</button>
+      <p class="small">יש לכם אנדרואיד? <a href="TapCircle.apk">אפשר גם להתקין את האפליקציה</a></p>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ov-invite">
+  <div class="wrap">
+    <div class="bubble">
+      <h1>הוזמנתם למשחק!</h1>
+      <p>קוד החדר</p>
+      <div class="code" id="invite-code"></div>
+      <div class="section"><span>השם שלכם (מוצג ליריב)</span><input type="text" id="invite-name" maxlength="16" placeholder="שחקן"></div>
+    </div>
+    <div class="buttons">
+      <button class="btn green" id="btn-invite-join">הצטרפות למשחק</button>
+      <button class="btn white" id="btn-invite-cancel">לתפריט הראשי</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ov-settings">
+  <div class="wrap">
+    <div class="bubble" style="text-align:right">
+      <h1 style="text-align:center">הגדרות</h1>
+      <div class="section"><span>השם שלכם (מוצג ליריב)</span><input type="text" id="name" maxlength="16" placeholder="שחקן"></div>
+      <div class="section"><span>רמת קושי</span>
+        <label class="opt"><input type="radio" name="difficulty" value="0">קל – עיגול גדול שנשאר יותר זמן</label>
+        <label class="opt"><input type="radio" name="difficulty" value="1">בינוני</label>
+        <label class="opt"><input type="radio" name="difficulty" value="2">קשה – עיגול קטן שנעלם מהר</label>
+      </div>
+      <div class="section"><span>זמן משחק</span>
+        <label class="opt"><input type="radio" name="duration" value="30">30 שניות</label>
+        <label class="opt"><input type="radio" name="duration" value="60">דקה</label>
+        <label class="opt"><input type="radio" name="duration" value="90">דקה וחצי</label>
+        <label class="opt"><input type="radio" name="duration" value="120">2 דקות</label>
+        <label class="opt"><input type="radio" name="duration" value="0">ללא הגבלת זמן</label>
+      </div>
+      <p class="note">העיגול הולך וקטן ככל שזמן המשחק מתקרב לסיומו.</p>
+    </div>
+    <div class="buttons"><button class="btn" id="btn-settings-back">חזרה למשחק</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="ov-join">
+  <div class="wrap">
+    <div class="bubble">
+      <h1>הצטרפות עם קוד</h1>
+      <p>הקלידו את קוד החדר שקיבלתם מהחבר</p>
+      <input type="text" class="ltr" id="join-code" maxlength="8" autocomplete="off" autocapitalize="characters" placeholder="XXXXXX">
+    </div>
+    <div class="buttons">
+      <button class="btn green" id="btn-join-go">הצטרפות</button>
+      <button class="btn white" id="btn-join-cancel">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ov-waiting">
+  <div class="wrap">
+    <div class="bubble">
+      <h1>קוד החדר שלכם</h1>
+      <div class="code" id="room-code"></div>
+      <p>שלחו את הקישור לחבר וחכו שיצטרף</p>
+      <p class="note" id="share-note"></p>
+    </div>
+    <div class="buttons">
+      <button class="btn green" id="btn-share">שיתוף קישור הזמנה</button>
+      <button class="btn blue" id="btn-whatsapp">שליחה בוואטסאפ</button>
+      <button class="btn white" id="btn-waiting-cancel">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ov-connecting">
+  <div class="wrap">
+    <div class="bubble"><h1 id="connecting-text">מתחבר…</h1></div>
+    <div class="buttons"><button class="btn white" id="btn-connecting-cancel">ביטול</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="ov-waitresult">
+  <div class="wrap">
+    <div class="bubble">
+      <h1>הניקוד שלכם</h1>
+      <div class="big" id="wait-score">0</div>
+      <p id="wait-text"></p>
+    </div>
+    <div class="buttons"><button class="btn white" id="btn-waitresult-menu">תפריט</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="ov-result">
+  <div class="wrap">
+    <div class="bubble">
+      <h1 id="result-title"></h1>
+      <p id="result-me"></p>
+      <p id="result-them"></p>
+      <p class="note" id="result-rematch-note"></p>
+    </div>
+    <div class="buttons">
+      <button class="btn green" id="btn-rematch">משחק חוזר</button>
+      <button class="btn white" id="btn-result-menu">תפריט</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ov-gameover">
+  <div class="wrap">
+    <div class="bubble">
+      <h1>הזמן נגמר!</h1>
+      <div class="big" id="final-score">0</div>
+      <p id="new-best">שיא חדש!</p>
+    </div>
+    <div class="buttons">
+      <button class="btn yellow" id="btn-again">שחקו שוב</button>
+      <button class="btn white" id="btn-gameover-menu">תפריט</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ov-pause">
+  <div class="wrap">
+    <div class="bubble"><h1>המשחק מושהה</h1></div>
+    <div class="buttons"><button class="btn green" id="btn-resume">המשך</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="ov-error">
+  <div class="wrap">
+    <div class="bubble"><h1 class="red">אופס!</h1><p id="error-text"></p></div>
+    <div class="buttons"><button class="btn white" id="btn-error-back">חזרה</button></div>
+  </div>
+</div>
+
+<script src="mqtt.min.js"></script>
+<script src="engine.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
