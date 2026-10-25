@@ -142,8 +142,11 @@
       const giveUp = () => { if (settled) return; settled = true; try { client.end(true); } catch (e) { /* ignore */ } onFail(); };
       const timeout = setTimeout(giveUp, 12000);
       client.on('connect', () => {
+        // Cancelled while connecting: drop the connection instead of keeping it alive forever.
+        if (this.closed) { settled = true; clearTimeout(timeout); try { client.end(true); } catch (e) { /* ignore */ } return; }
         client.subscribe(topic, { qos: 1 }, (err) => {
           if (settled) return;
+          if (this.closed) { settled = true; clearTimeout(timeout); try { client.end(true); } catch (e) { /* ignore */ } return; }
           if (err) { clearTimeout(timeout); giveUp(); return; }
           settled = true; clearTimeout(timeout);
           this.client = client; this.topic = topic;
@@ -259,11 +262,19 @@
     }
     close() {
       if (this.closed) return;
-      if (this.roomCode && (this.hostId || this.guestId || this.isHost)) this.send({ t: 'leave' });
+      const leaving = !!(this.roomCode && (this.hostId || this.guestId || this.isHost));
       this.closed = true;
       Object.keys(this.timers).forEach(k => this.clearTimer(k));
       const c = this.client; this.client = null;
-      if (c) { try { c.end(true); } catch (e) { /* ignore */ } }
+      if (!c) return;
+      if (!leaving) { try { c.end(true); } catch (e) { /* ignore */ } return; }
+      // Let the 'leave' reach the broker before the socket goes away; force-close as a fallback.
+      let ended = false;
+      const finish = (force) => { if (ended) return; ended = true; try { c.end(force); } catch (e) { /* ignore */ } };
+      const fallback = setTimeout(() => finish(true), 1500);
+      try {
+        c.publish(this.topic, JSON.stringify({ id: this.playerId, t: 'leave' }), { qos: 1 }, () => { clearTimeout(fallback); finish(false); });
+      } catch (e) { clearTimeout(fallback); finish(true); }
     }
   }
 
