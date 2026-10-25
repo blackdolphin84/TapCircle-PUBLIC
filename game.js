@@ -127,7 +127,7 @@
     }
     readyLoop() {
       if (this.closed || this.phase !== 'WAITING_FOR_HOST' || !this.hostId) return;
-      this.send({ t: 'ready', name: this.playerName });
+      if (this.foreground()) this.send({ t: 'ready', name: this.playerName });
       this.setTimer('ready', () => this.readyLoop(), READY_INTERVAL_MS);
     }
     connect(letter, code, onOk, onFail) {
