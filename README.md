@@ -1,13 +1,15 @@
 # Tap Circle – web
 
-גרסת הווב של המשחק "גע בעיגול": משחק רפלקסים לבד או ראש בראש מול חבר, שנפתח ישר מקישור ההזמנה בדפדפן של הטלפון.
+The mobile web version of Tap Circle: a reflex game you play solo or head to head against a friend,
+opened straight from an invite link in the phone's browser.
 
-הכתובת: https://blackdolphin84.github.io/TapCircle-PUBLIC/
+Live at: https://blackdolphin84.github.io/TapCircle-PUBLIC/
 
-- `index.html`, `game.js`, `engine.js` – המשחק (Canvas + ממשק HTML בסגנון קומיקס). `engine.js` הוא העתק מדויק של לוגיקת המשחק
-  באפליקציית האנדרואיד, כולל מחולל האקראיות של Kotlin, כך ששחקן באפליקציה ושחקן בדפדפן רואים את אותם עיגולים.
-- המולטיפלייר עובר דרך שרתי MQTT ציבוריים (HiveMQ / EMQX / Mosquitto) ב-WebSocket; האפליקציה מתחברת לאותם שרתים.
-- `mqtt.min.js` – [MQTT.js](https://github.com/mqttjs/MQTT.js) (רישיון MIT).
-- `fonts/` – Secular One ו-Bangers (רישיון SIL OFL).
-- `TapCircle.apk` – אפליקציית האנדרואיד להתקנה ישירה.
-- `.github/workflows/pages.yml` – פרסום אוטומטי ל-GitHub Pages בכל דחיפה ל-`main`.
+- `index.html`, `game.js`, `engine.js`, `sfx.js` – the game (Canvas + comic-style HTML overlays, synthesized sounds).
+  `engine.js` is an exact port of the Android app's game logic, including Kotlin's random generator, so an app
+  player and a browser player see the same circles.
+- Multiplayer runs over public MQTT brokers (HiveMQ / EMQX / Mosquitto) via WebSocket; the app connects to the same brokers.
+- `mqtt.min.js` – [MQTT.js](https://github.com/mqttjs/MQTT.js) (MIT).
+- `fonts/` – Secular One and Bangers (SIL OFL).
+- `TapCircle.apk` – the Android app for direct install.
+- `.github/workflows/pages.yml` – deploys to GitHub Pages on every push to `main`.

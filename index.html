@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="he" dir="rtl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -7,8 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="description" content="Tap Circle – משחק רפלקסים: געו בעיגול לפני שהוא נעלם. לבד או ראש בראש מול חבר.">
-<title>Tap Circle – גע בעיגול</title>
+<meta name="description" content="Tap Circle – a reflex game: tap the circle before it vanishes. Play solo or head to head against a friend.">
+<title>Tap Circle</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -43,7 +43,7 @@
   .small a { color:var(--ink); }
   input[type=text] { width:100%; height:48px; font:inherit; font-size:17px; padding:0 12px; border:3px solid var(--ink); border-radius:8px; background:var(--paper); color:var(--ink); text-align:center; }
   input.ltr { direction:ltr; letter-spacing:3px; text-transform:uppercase; }
-  .section { margin-top:16px; text-align:right; }
+  .section { margin-top:16px; text-align:left; }
   .section > span { color:var(--red); font-size:15px; display:block; margin-bottom:4px; }
   label.opt { display:flex; align-items:center; gap:10px; padding:7px 4px; font-size:16px; }
   label.opt input { width:20px; height:20px; accent-color:var(--red); margin:0; }
@@ -55,22 +55,22 @@
 <canvas id="game"></canvas>
 
 <div id="hud-buttons">
-  <button class="btn green" id="btn-restart">מחדש</button>
-  <button class="btn white" id="btn-menu">תפריט</button>
+  <button class="btn green" id="btn-restart">Restart</button>
+  <button class="btn white" id="btn-menu">Menu</button>
 </div>
 
 <div class="overlay" id="ov-start">
   <div class="wrap">
     <div class="bubble">
       <h1>Tap Circle</h1>
-      <p>געו בעיגול לפני שהוא נעלם<br>‎+100 פגיעה · ‎−100 פספוס</p>
+      <p>Tap the circle before it vanishes<br>+100 hit · −100 miss</p>
     </div>
     <div class="buttons">
-      <button class="btn yellow" id="btn-solo">שחקו לבד</button>
-      <button class="btn" id="btn-host">משחק מול חבר</button>
-      <button class="btn blue" id="btn-join">הצטרפות עם קוד</button>
-      <button class="btn white" id="btn-settings">הגדרות</button>
-      <p class="small">יש לכם אנדרואיד? <a href="TapCircle.apk">אפשר גם להתקין את האפליקציה</a></p>
+      <button class="btn yellow" id="btn-solo">Play solo</button>
+      <button class="btn" id="btn-host">Play vs a friend</button>
+      <button class="btn blue" id="btn-join">Join with a code</button>
+      <button class="btn white" id="btn-settings">Settings</button>
+      <p class="small">On Android? <a href="TapCircle.apk">You can also install the app</a></p>
     </div>
   </div>
 </div>
@@ -78,51 +78,54 @@
 <div class="overlay" id="ov-invite">
   <div class="wrap">
     <div class="bubble">
-      <h1>הוזמנתם למשחק!</h1>
-      <p>קוד החדר</p>
+      <h1>You've been invited!</h1>
+      <p>Room code</p>
       <div class="code" id="invite-code"></div>
-      <div class="section"><span>השם שלכם (מוצג ליריב)</span><input type="text" id="invite-name" maxlength="16" placeholder="שחקן"></div>
+      <div class="section"><span>Your name (shown to your rival)</span><input type="text" id="invite-name" maxlength="16" placeholder="Player"></div>
     </div>
     <div class="buttons">
-      <button class="btn green" id="btn-invite-join">הצטרפות למשחק</button>
-      <button class="btn white" id="btn-invite-cancel">לתפריט הראשי</button>
+      <button class="btn green" id="btn-invite-join">Join the game</button>
+      <button class="btn white" id="btn-invite-cancel">Main menu</button>
     </div>
   </div>
 </div>
 
 <div class="overlay" id="ov-settings">
   <div class="wrap">
-    <div class="bubble" style="text-align:right">
-      <h1 style="text-align:center">הגדרות</h1>
-      <div class="section"><span>השם שלכם (מוצג ליריב)</span><input type="text" id="name" maxlength="16" placeholder="שחקן"></div>
-      <div class="section"><span>רמת קושי</span>
-        <label class="opt"><input type="radio" name="difficulty" value="0">קל – עיגול גדול שנשאר יותר זמן</label>
-        <label class="opt"><input type="radio" name="difficulty" value="1">בינוני</label>
-        <label class="opt"><input type="radio" name="difficulty" value="2">קשה – עיגול קטן שנעלם מהר</label>
+    <div class="bubble" style="text-align:left">
+      <h1 style="text-align:center">Settings</h1>
+      <div class="section"><span>Your name (shown to your rival)</span><input type="text" id="name" maxlength="16" placeholder="Player"></div>
+      <div class="section"><span>Difficulty</span>
+        <label class="opt"><input type="radio" name="difficulty" value="0">Easy – big circle, stays longer</label>
+        <label class="opt"><input type="radio" name="difficulty" value="1">Medium</label>
+        <label class="opt"><input type="radio" name="difficulty" value="2">Hard – small circle, vanishes fast</label>
       </div>
-      <div class="section"><span>זמן משחק</span>
-        <label class="opt"><input type="radio" name="duration" value="30">30 שניות</label>
-        <label class="opt"><input type="radio" name="duration" value="60">דקה</label>
-        <label class="opt"><input type="radio" name="duration" value="90">דקה וחצי</label>
-        <label class="opt"><input type="radio" name="duration" value="120">2 דקות</label>
-        <label class="opt"><input type="radio" name="duration" value="0">ללא הגבלת זמן</label>
+      <div class="section"><span>Game time</span>
+        <label class="opt"><input type="radio" name="duration" value="30">30 seconds</label>
+        <label class="opt"><input type="radio" name="duration" value="60">1 minute</label>
+        <label class="opt"><input type="radio" name="duration" value="90">1.5 minutes</label>
+        <label class="opt"><input type="radio" name="duration" value="120">2 minutes</label>
+        <label class="opt"><input type="radio" name="duration" value="0">Unlimited</label>
       </div>
-      <p class="note">העיגול הולך וקטן ככל שזמן המשחק מתקרב לסיומו.</p>
+      <div class="section"><span>Sound</span>
+        <label class="opt"><input type="checkbox" id="sound">Sound effects (hit, miss, countdown)</label>
+      </div>
+      <p class="note">The circle gets smaller as the game time runs out.</p>
     </div>
-    <div class="buttons"><button class="btn" id="btn-settings-back">חזרה למשחק</button></div>
+    <div class="buttons"><button class="btn" id="btn-settings-back">Back to game</button></div>
   </div>
 </div>
 
 <div class="overlay" id="ov-join">
   <div class="wrap">
     <div class="bubble">
-      <h1>הצטרפות עם קוד</h1>
-      <p>הקלידו את קוד החדר שקיבלתם מהחבר</p>
+      <h1>Join with a code</h1>
+      <p>Type the room code you got from your friend</p>
       <input type="text" class="ltr" id="join-code" maxlength="8" autocomplete="off" autocapitalize="characters" placeholder="XXXXXX">
     </div>
     <div class="buttons">
-      <button class="btn green" id="btn-join-go">הצטרפות</button>
-      <button class="btn white" id="btn-join-cancel">ביטול</button>
+      <button class="btn green" id="btn-join-go">Join</button>
+      <button class="btn white" id="btn-join-cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -130,34 +133,34 @@
 <div class="overlay" id="ov-waiting">
   <div class="wrap">
     <div class="bubble">
-      <h1>קוד החדר שלכם</h1>
+      <h1>Your room code</h1>
       <div class="code" id="room-code"></div>
-      <p>שלחו את הקישור לחבר וחכו שיצטרף</p>
+      <p>Share the link with a friend and wait for them to join</p>
       <p class="note" id="share-note"></p>
     </div>
     <div class="buttons">
-      <button class="btn green" id="btn-share">שיתוף קישור הזמנה</button>
-      <button class="btn blue" id="btn-whatsapp">שליחה בוואטסאפ</button>
-      <button class="btn white" id="btn-waiting-cancel">ביטול</button>
+      <button class="btn green" id="btn-share">Share invite link</button>
+      <button class="btn blue" id="btn-whatsapp">Send on WhatsApp</button>
+      <button class="btn white" id="btn-waiting-cancel">Cancel</button>
     </div>
   </div>
 </div>
 
 <div class="overlay" id="ov-connecting">
   <div class="wrap">
-    <div class="bubble"><h1 id="connecting-text">מתחבר…</h1></div>
-    <div class="buttons"><button class="btn white" id="btn-connecting-cancel">ביטול</button></div>
+    <div class="bubble"><h1 id="connecting-text">Connecting…</h1></div>
+    <div class="buttons"><button class="btn white" id="btn-connecting-cancel">Cancel</button></div>
   </div>
 </div>
 
 <div class="overlay" id="ov-waitresult">
   <div class="wrap">
     <div class="bubble">
-      <h1>הניקוד שלכם</h1>
+      <h1>Your score</h1>
       <div class="big" id="wait-score">0</div>
       <p id="wait-text"></p>
     </div>
-    <div class="buttons"><button class="btn white" id="btn-waitresult-menu">תפריט</button></div>
+    <div class="buttons"><button class="btn white" id="btn-waitresult-menu">Menu</button></div>
   </div>
 </div>
 
@@ -170,8 +173,8 @@
       <p class="note" id="result-rematch-note"></p>
     </div>
     <div class="buttons">
-      <button class="btn green" id="btn-rematch">משחק חוזר</button>
-      <button class="btn white" id="btn-result-menu">תפריט</button>
+      <button class="btn green" id="btn-rematch">Rematch</button>
+      <button class="btn white" id="btn-result-menu">Menu</button>
     </div>
   </div>
 </div>
@@ -179,32 +182,33 @@
 <div class="overlay" id="ov-gameover">
   <div class="wrap">
     <div class="bubble">
-      <h1>הזמן נגמר!</h1>
+      <h1>Time's up!</h1>
       <div class="big" id="final-score">0</div>
-      <p id="new-best">שיא חדש!</p>
+      <p id="new-best">New best score!</p>
     </div>
     <div class="buttons">
-      <button class="btn yellow" id="btn-again">שחקו שוב</button>
-      <button class="btn white" id="btn-gameover-menu">תפריט</button>
+      <button class="btn yellow" id="btn-again">Play again</button>
+      <button class="btn white" id="btn-gameover-menu">Menu</button>
     </div>
   </div>
 </div>
 
 <div class="overlay" id="ov-pause">
   <div class="wrap">
-    <div class="bubble"><h1>המשחק מושהה</h1></div>
-    <div class="buttons"><button class="btn green" id="btn-resume">המשך</button></div>
+    <div class="bubble"><h1>Paused</h1></div>
+    <div class="buttons"><button class="btn green" id="btn-resume">Resume</button></div>
   </div>
 </div>
 
 <div class="overlay" id="ov-error">
   <div class="wrap">
-    <div class="bubble"><h1 class="red">אופס!</h1><p id="error-text"></p></div>
-    <div class="buttons"><button class="btn white" id="btn-error-back">חזרה</button></div>
+    <div class="bubble"><h1 class="red">Oops!</h1><p id="error-text"></p></div>
+    <div class="buttons"><button class="btn white" id="btn-error-back">Back</button></div>
   </div>
 </div>
 
 <script src="mqtt.min.js"></script>
+<script src="sfx.js"></script>
 <script src="engine.js"></script>
 <script src="game.js"></script>
 </body>

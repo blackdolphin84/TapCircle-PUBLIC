@@ -24,8 +24,6 @@
     BLUE: '#2F8BFF', GREEN: '#3DD267', ORANGE: '#FF9F1C', PURPLE: '#B15CFF', PINK: '#FF4FA3', CYAN: '#31D4E6',
   };
   const BALL_COLORS = [C.RED, C.BLUE, C.GREEN, C.ORANGE, C.PURPLE, C.PINK, C.CYAN];
-  const DIFFICULTY_NAMES = ['קל', 'בינוני', 'קשה'];
-  const DURATION_NAMES = { 30: '30 שניות', 60: 'דקה', 90: 'דקה וחצי', 120: '2 דקות', 0: 'ללא הגבלת זמן' };
 
   // ---------------------------------------------------------------- storage
   const store = {
@@ -52,7 +50,8 @@
     }
     return id;
   }
-  function playerName() { const n = (store.get('playerName', '') || '').trim(); return n || 'שחקן'; }
+  function playerName() { const n = (store.get('playerName', '') || '').trim(); return n || 'Player'; }
+  function soundEnabled() { return store.get('sound', true) !== false; }
 
   // ---------------------------------------------------------------- codes & links
   function newRoomCode(letter) {
@@ -72,7 +71,7 @@
   }
   function inviteUrl(code) { return SITE_URL + '#join=' + code; }
   function inviteText(code) {
-    return 'בואו נשחק Tap Circle ראש בראש!\nקוד החדר: ' + code + '\nלחצו על הקישור כדי לשחק (נפתח ישר בדפדפן):\n' + inviteUrl(code);
+    return "Let's play Tap Circle head to head!\nRoom code: " + code + '\nTap the link to play (opens right in the browser):\n' + inviteUrl(code);
   }
 
   // ---------------------------------------------------------------- duel session (mirrors DuelSession.kt)
@@ -382,6 +381,9 @@
   const ctx = canvas.getContext('2d');
   const painter = new Painter(ctx);
   const engine = new E.GameEngine();
+  const sfx = window.TapSfx;
+  sfx.setEnabled(soundEnabled());
+  let lastCountdownNumber = 0;
   const state = {
     settings: loadSettings(), best: 0, bestAtRoundStart: 0, newBest: false, roundEndedAt: 0,
     popups: [], popupCounter: 0, duel: null, width: 0, height: 0, hudHeight: 146, background: null,
@@ -434,11 +436,11 @@
   function handleEvent(e, now) {
     const d = state.duel;
     switch (e.type) {
-      case 'hit': addPopup(e.x, e.y, e.points, now); vibrate(15); if (d) d.publishScore(engine.score); break;
-      case 'miss': addPopup(e.x, e.y, e.points, now); vibrate([10, 30, 10]); if (d) d.publishScore(engine.score); break;
-      case 'vanished': addPopup(e.x, e.y, e.points, now); if (d) d.publishScore(engine.score); break;
+      case 'hit': addPopup(e.x, e.y, e.points, now); vibrate(15); sfx.hit(); if (d) d.publishScore(engine.score); break;
+      case 'miss': addPopup(e.x, e.y, e.points, now); vibrate([10, 30, 10]); sfx.miss(); if (d) d.publishScore(engine.score); break;
+      case 'vanished': addPopup(e.x, e.y, e.points, now); sfx.miss(); if (d) d.publishScore(engine.score); break;
       case 'roundEnded':
-        state.popups.length = 0; state.roundEndedAt = now; vibrate(60);
+        state.popups.length = 0; state.roundEndedAt = now; vibrate(60); sfx.end();
         if (d) d.publishDone(engine.score);
         else { state.newBest = engine.score > state.bestAtRoundStart; }
         break;
@@ -492,41 +494,42 @@
     engine.reseed(d.seed);
     engine.start(now);
     d.markPlaying();
+    sfx.go();
     showOverlay(null);
   }
   function syncDuelUi() {
     const d = state.duel; if (!d) return;
     const name = shortName(d.opponentName);
     switch (d.phase) {
-      case 'CONNECTING': $('connecting-text').textContent = 'מתחבר לשרת המשחק…'; showOverlay('ov-connecting'); break;
+      case 'CONNECTING': $('connecting-text').textContent = 'Connecting to the game server…'; showOverlay('ov-connecting'); break;
       case 'WAITING_FOR_GUEST': $('room-code').textContent = d.roomCode; showOverlay('ov-waiting'); break;
       case 'WAITING_FOR_HOST': case 'STARTING':
-        $('connecting-text').textContent = d.opponentName ? 'מתחילים מול ' + name + '…' : 'ממתין למארח… (קוד ' + isolate(d.roomCode) + ')';
+        $('connecting-text').textContent = d.opponentName ? 'Starting against ' + name + '…' : 'Waiting for the host… (room ' + d.roomCode + ')';
         showOverlay('ov-connecting'); break;
       case 'COUNTDOWN': showOverlay(null); break;
       case 'PLAYING': showOverlay(null); break;
       case 'WAITING_RESULT':
         $('wait-score').textContent = formatScore(engine.score);
-        $('wait-text').textContent = 'ממתין ש' + name + ' יסיים…';
+        $('wait-text').textContent = 'Waiting for ' + name + ' to finish…';
         showOverlay('ov-waitresult', true); break;
       case 'FINISHED': {
         const o = d.outcome();
         const title = $('result-title');
-        title.textContent = o > 0 ? 'ניצחת!' : o < 0 ? 'הפסדת…' : 'תיקו!';
+        title.textContent = o > 0 ? 'YOU WIN!' : o < 0 ? 'You lost…' : 'Draw!';
         title.className = o > 0 ? 'green' : o < 0 ? 'red' : '';
-        $('result-me').textContent = 'אתם: ' + isolate(formatScore(d.myFinalScore === null ? engine.score : d.myFinalScore));
-        $('result-them').textContent = name + ': ' + isolate(formatScore(d.opponentFinalScore === null ? d.opponentScore : d.opponentFinalScore));
-        $('result-rematch-note').textContent = d.opponentLeft ? name + ' עזב את המשחק.' : d.opponentWantsRematch ? name + ' רוצה משחק חוזר!' : '';
+        $('result-me').textContent = 'You: ' + formatScore(d.myFinalScore === null ? engine.score : d.myFinalScore);
+        $('result-them').textContent = name + ': ' + formatScore(d.opponentFinalScore === null ? d.opponentScore : d.opponentFinalScore);
+        $('result-rematch-note').textContent = d.opponentLeft ? name + ' left the game.' : d.opponentWantsRematch ? name + ' wants a rematch!' : '';
         $('btn-rematch').style.display = d.opponentLeft ? 'none' : '';
         showOverlay('ov-result', true); break;
       }
-      case 'REMATCH_WAIT': $('connecting-text').textContent = 'ממתין ליריב למשחק חוזר…'; showOverlay('ov-connecting'); break;
+      case 'REMATCH_WAIT': $('connecting-text').textContent = 'Waiting for your rival…'; showOverlay('ov-connecting'); break;
       case 'ERROR': {
         const msgs = {
-          CONNECT_FAILED: 'לא הצלחנו להתחבר לשרת המשחק. בדקו את החיבור לאינטרנט ונסו שוב.',
-          HOST_NOT_FOUND: 'לא נמצא משחק פתוח עם הקוד הזה. בקשו מהחבר לפתוח משחק ולשלוח את הקישור שוב.',
-          BAD_CODE: 'זה לא קוד חדר תקין.',
-          OPPONENT_LEFT: name + ' עזב את המשחק.',
+          CONNECT_FAILED: 'Could not reach the game server. Check your internet connection and try again.',
+          HOST_NOT_FOUND: 'No open game with this code. Ask your friend to start a game and share the link again.',
+          BAD_CODE: 'That is not a valid room code.',
+          OPPONENT_LEFT: name + ' left the game.',
         };
         $('error-text').textContent = msgs[d.error] || msgs.CONNECT_FAILED;
         showOverlay('ov-error'); break;
@@ -536,8 +539,7 @@
 
   // ---- formatting
   function formatScore(s) { return s < 0 ? '-' + Math.abs(s) : String(s); }
-  function isolate(s) { return '\u2066' + s + '\u2069'; }
-  function shortName(n) { n = (n || '').trim() || 'היריב'; return n.length > 12 ? n.slice(0, 11) + '…' : n; }
+  function shortName(n) { n = (n || '').trim() || 'Rival'; return n.length > 12 ? n.slice(0, 11) + '…' : n; }
   function formatTime(ms) { const s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 
   // ---- drawing
@@ -550,17 +552,17 @@
   function drawHud(now) {
     const w = state.width, d = state.duel;
     const boxW = Math.min(102, w * 0.3 - 8), boxH = 54, top = 34;
-    const scoreX = w * 0.8, sideX = w * 0.2;
+    const scoreX = w * 0.2, sideX = w * 0.8;
     const countingDown = d && d.phase === 'COUNTDOWN';
-    drawCaption(scoreX - boxW / 2, top, boxW, boxH, -2, C.YELLOW, 'ניקוד', formatScore(countingDown ? 0 : engine.score), C.WHITE);
-    if (d) drawCaption(sideX - boxW / 2, top, boxW, boxH, 2, C.RED, (d.opponentName || 'יריב').slice(0, 10), formatScore(d.opponentScore), C.WHITE);
-    else drawCaption(sideX - boxW / 2, top, boxW, boxH, 2, C.BLUE, 'שיא', formatScore(state.best), C.WHITE);
+    drawCaption(scoreX - boxW / 2, top, boxW, boxH, -2, C.YELLOW, 'SCORE', formatScore(countingDown ? 0 : engine.score), C.WHITE);
+    if (d) drawCaption(sideX - boxW / 2, top, boxW, boxH, 2, C.RED, (d.opponentName || 'RIVAL').slice(0, 10).toUpperCase(), formatScore(d.opponentScore), C.WHITE);
+    else drawCaption(sideX - boxW / 2, top, boxW, boxH, 2, C.BLUE, 'BEST', formatScore(state.best), C.WHITE);
     if (countingDown) {
-      drawCaption(w / 2 - boxW / 2, top, boxW, boxH, 0, C.WHITE, 'זמן', formatTime(d.duelSettings.durationSec * 1000), C.WHITE);
+      drawCaption(w / 2 - boxW / 2, top, boxW, boxH, 0, C.WHITE, 'TIME', formatTime(d.duelSettings.durationSec * 1000), C.WHITE);
     } else if (E.isTimed(engine.activeSettings)) {
       const remaining = engine.remainingMs(now), warning = remaining <= WARNING_MS && engine.state === 'PLAYING';
       const fill = warning && Math.floor(now / 300) % 2 === 0 ? C.ORANGE : C.WHITE;
-      drawCaption(w / 2 - boxW / 2, top, boxW, boxH, 0, fill, 'זמן', formatTime(remaining), warning ? C.YELLOW : C.WHITE);
+      drawCaption(w / 2 - boxW / 2, top, boxW, boxH, 0, fill, 'TIME', formatTime(remaining), warning ? C.YELLOW : C.WHITE);
     }
   }
   function drawBall(c, now) {
@@ -589,6 +591,7 @@
   }
   function drawCountdown(d, now) {
     const elapsed = now - d.countdownStartedAt, n = Math.min(3, Math.max(1, 3 - Math.floor(elapsed / 1000)));
+    if (n !== lastCountdownNumber) { lastCountdownNumber = n; sfx.tick(); }
     const cx = state.width / 2, cy = state.hudHeight + (state.height - state.hudHeight) / 2;
     const scale = 1.15 - 0.15 * ((elapsed % 1000) / 1000);
     ctx.save(); ctx.translate(cx, cy); ctx.scale(scale, scale); ctx.translate(-cx, -cy);
@@ -616,6 +619,7 @@
   }
 
   // ---- input
+  document.addEventListener('pointerdown', () => sfx.unlock(), { capture: true });
   canvas.addEventListener('pointerdown', (ev) => {
     ev.preventDefault();
     if (state.overlay) return;
@@ -676,7 +680,7 @@
     if (navigator.share) {
       try { await navigator.share({ title: 'Tap Circle', text, url }); return; } catch (e) { /* cancelled; fall through */ }
     }
-    try { await navigator.clipboard.writeText(text); $('share-note').textContent = 'הקישור הועתק – הדביקו אותו בוואטסאפ'; }
+    try { await navigator.clipboard.writeText(text); $('share-note').textContent = 'Link copied – paste it in WhatsApp or any chat'; }
     catch (e) { $('share-note').textContent = url; }
   }
   $('btn-share').addEventListener('click', share);
@@ -690,6 +694,7 @@
     $('name').value = store.get('playerName', '') || '';
     document.querySelectorAll('input[name=difficulty]').forEach(r => { r.checked = Number(r.value) === state.settings.difficulty; });
     document.querySelectorAll('input[name=duration]').forEach(r => { r.checked = Number(r.value) === state.settings.durationSec; });
+    $('sound').checked = soundEnabled();
     showOverlay('ov-settings');
   }
   function saveSettings() {
@@ -698,6 +703,8 @@
     state.settings = { difficulty: diff ? Number(diff.value) : 1, durationSec: dur ? Number(dur.value) : 60 };
     store.set('settings', state.settings);
     store.set('playerName', $('name').value.trim());
+    store.set('sound', $('sound').checked);
+    sfx.setEnabled($('sound').checked);
     engine.applySettings(state.settings);
     state.best = loadBest(state.settings);
   }
